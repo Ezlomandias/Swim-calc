@@ -83,7 +83,9 @@ const Y_DISTANCE_MARKERS = [100, 200, 400, 800, 1500] as const;
 const X_DISTANCE_MARKERS = [200, 400, 800] as const;
 
 export function graphYTicks(distance: number): number[] {
-  const ticks = Y_DISTANCE_MARKERS.filter((d) => d <= distance);
+  const ticks: number[] = [
+    ...Y_DISTANCE_MARKERS.filter((d) => d <= distance),
+  ];
   if (!ticks.includes(distance)) {
     ticks.push(distance);
   }
