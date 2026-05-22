@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   buildEvenPaces,
   buildSplits,
@@ -51,19 +51,58 @@ function Panel({
   );
 }
 
+const STORAGE_KEY = "swim-calc-state";
+
+function loadSaved(): { distanceStr: string; timeStr: string; paceIn: PaceInterval; paces: number[] } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed.distanceStr !== "string" ||
+      typeof parsed.timeStr !== "string" ||
+      (parsed.paceIn !== 50 && parsed.paceIn !== 100) ||
+      !Array.isArray(parsed.paces) ||
+      !parsed.paces.every((p: unknown) => typeof p === "number")
+    ) return null;
+    return parsed as { distanceStr: string; timeStr: string; paceIn: PaceInterval; paces: number[] };
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_PACES = buildEvenPaces(parseTime(DEFAULT_TIME) ?? 0, Number(DEFAULT_DISTANCE), 100);
+
 export function SwimCalculator() {
   const [distanceStr, setDistanceStr] = useState(DEFAULT_DISTANCE);
   const [timeStr, setTimeStr] = useState(DEFAULT_TIME);
   const [paceIn, setPaceIn] = useState<PaceInterval>(100);
-  const initialPaces = (() => {
-    const d = Number(DEFAULT_DISTANCE);
-    const t = parseTime(DEFAULT_TIME) ?? 0;
-    return buildEvenPaces(t, d, 100);
-  })();
-  const [paces, setPaces] = useState<number[]>(initialPaces);
+  const [paces, setPaces] = useState<number[]>(DEFAULT_PACES);
   const [paceInputs, setPaceInputs] = useState<string[]>(() =>
-    initialPaces.map(formatPace),
+    DEFAULT_PACES.map(formatPace),
   );
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    const saved = loadSaved();
+    if (saved) {
+      setDistanceStr(saved.distanceStr);
+      setTimeStr(saved.timeStr);
+      setPaceIn(saved.paceIn);
+      setPaces(saved.paces);
+      setPaceInputs(saved.paces.map(formatPace));
+    }
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ distanceStr, timeStr, paceIn, paces }));
+    } catch {
+      // ignore (private browsing, quota exceeded)
+    }
+  }, [isHydrated, distanceStr, timeStr, paceIn, paces]);
 
   const setPacesOnly = useCallback((next: number[]) => {
     setPaces(next);
