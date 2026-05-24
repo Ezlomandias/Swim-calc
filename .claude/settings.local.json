@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c cd C:\\\\praxe\\\\swim-calc && npm run dev > C:\\\\praxe\\\\swim-calc\\\\dev-server.log 2>&1\" -WindowStyle Hidden)"
+    ]
+  }
+}

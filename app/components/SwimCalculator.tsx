@@ -25,6 +25,20 @@ const inputClass =
 const labelClass =
   "text-[11px] font-medium uppercase tracking-wider text-foreground-soft sm:text-xs";
 
+function WaveIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 26 16" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M1 11 C3 7, 6 15, 9 10.5 C11.5 7, 13.5 14, 16.5 10 C18.5 7, 20.5 13, 23 10 C24 9, 24.5 9.5, 25.5 9"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function Panel({
   title,
   children,
@@ -36,7 +50,7 @@ function Panel({
 }) {
   return (
     <div className="card-elevated-sm flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface-elevated">
-      <div className="shrink-0 bg-accent-deep px-3.5 py-2.5 sm:px-4 sm:py-3">
+      <div className="shrink-0 bg-gradient-to-r from-accent-deep to-[#0d4f62] px-3.5 py-2.5 sm:px-4 sm:py-3">
         <h2 className="text-sm font-semibold tracking-wide text-white">
           {title}
         </h2>
@@ -72,6 +86,13 @@ function loadSaved(): { distanceStr: string; timeStr: string; paceIn: PaceInterv
 }
 
 const DEFAULT_PACES = buildEvenPaces(parseTime(DEFAULT_TIME) ?? 0, Number(DEFAULT_DISTANCE), 100);
+
+function getPaceDeviationClass(pace: number, avg: number): { stripe: string; text: string } {
+  const dev = (pace - avg) / avg;
+  if (dev > 0.025) return { stripe: "bg-warning", text: "text-warning" };
+  if (dev < -0.025) return { stripe: "bg-success", text: "text-success" };
+  return { stripe: "bg-transparent", text: "text-foreground" };
+}
 
 export function SwimCalculator() {
   const [distanceStr, setDistanceStr] = useState(DEFAULT_DISTANCE);
@@ -173,146 +194,166 @@ export function SwimCalculator() {
   return (
     <div className="min-h-dvh px-3 pb-8 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pb-12 sm:pt-8 lg:py-12">
       <div className="mx-auto w-full max-w-4xl space-y-5 sm:space-y-8">
-        <header className="card-elevated rounded-xl border border-border bg-surface-elevated px-4 py-5 text-center sm:px-6 sm:text-left">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent sm:text-xs">
-            Plavecká kalkulačka
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Swim Calc
-          </h1>
-          <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-foreground-soft sm:mx-0 sm:max-w-xl">
-            Délka, čas a tempo — splits a graf se dopočítají samy.
-          </p>
+
+        {/* Header */}
+        <header className="card-elevated overflow-hidden rounded-xl border border-border bg-surface-elevated">
+          <div className="h-1.5 bg-gradient-to-r from-accent-deep via-accent-mid to-accent-light" />
+          <div className="px-4 py-4 text-center sm:px-6 sm:py-5 sm:text-left">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-accent sm:text-xs">
+              Plavecká kalkulačka
+            </p>
+            <h1 className="mt-1.5 flex items-center justify-center gap-2.5 text-2xl font-bold tracking-tight text-foreground sm:justify-start sm:text-4xl">
+              <WaveIcon className="size-6 shrink-0 text-accent sm:size-8" />
+              Swim Calc
+            </h1>
+            <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-foreground-soft sm:mx-0 sm:max-w-xl">
+              Délka, čas a tempo — splits a graf se dopočítají samy.
+            </p>
+          </div>
         </header>
 
-        <section className="card-elevated rounded-xl border border-border bg-surface-elevated p-4 sm:p-6">
-          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-3 sm:gap-5">
-            <label className="block space-y-1.5 sm:space-y-2">
-              <span className={labelClass}>Délka</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={distanceStr}
-                onChange={(e) => setDistanceStr(e.target.value)}
-                onBlur={commitDistance}
-                placeholder="1500"
-                className={inputClass}
-              />
-              <span className="block text-[11px] text-muted sm:text-xs">
-                m · násobek {paceIn}
-              </span>
-            </label>
-
-            <label className="block space-y-1.5 sm:space-y-2">
-              <span className={labelClass}>Time</span>
-              <input
-                type="text"
-                value={timeStr}
-                onChange={(e) => setTimeStr(e.target.value)}
-                onBlur={commitTime}
-                placeholder="20:00.00"
-                className={inputClass}
-              />
-              <span className="block text-[11px] text-muted sm:text-xs">
-                např. 20:00
-              </span>
-            </label>
-
-            <div className="space-y-1.5 sm:space-y-2">
-              <span className={labelClass}>Pace in</span>
-              <div className="grid min-h-11 grid-cols-2 gap-1 rounded-lg border border-border bg-surface-muted p-1 sm:min-h-0">
-                {([50, 100] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => handlePaceInChange(n)}
-                    className={`min-h-10 rounded-md px-3 py-2.5 font-mono text-sm font-semibold transition-colors active:scale-[0.98] sm:min-h-0 sm:py-2 ${
-                      paceIn === n
-                        ? "bg-accent text-surface-elevated"
-                        : "text-foreground-soft hover:bg-surface-elevated"
-                    }`}
-                  >
-                    {n} m
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {distanceStr.trim() !== "" && !validDistance && (
-            <p
-              role="alert"
-              className="mt-4 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2.5 text-sm text-warning"
-            >
-              {distance > 0
-                ? `Délka musí být násobek ${paceIn}.`
-                : "Zadej platnou délku."}
-            </p>
-          )}
-
-          {avgPace != null && (
-            <div className="mt-5 grid grid-cols-1 gap-3 border-t border-border-subtle pt-5 sm:grid-cols-2 sm:gap-4">
-              <div className="flex flex-col items-center gap-1 sm:items-start">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted">
-                  Průměrné tempo
+        {/* Inputs */}
+        <section className="card-elevated overflow-hidden rounded-xl border border-border bg-surface-elevated">
+          <div className="h-px bg-gradient-to-r from-accent-deep/60 via-accent/40 to-transparent" />
+          <div className="p-4 sm:p-6">
+            <div className="flex flex-col gap-4 sm:grid sm:grid-cols-3 sm:gap-5">
+              <label className="block space-y-1.5 sm:space-y-2">
+                <span className={labelClass}>Délka</span>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={distanceStr}
+                    onChange={(e) => setDistanceStr(e.target.value)}
+                    onBlur={commitDistance}
+                    placeholder="1500"
+                    className={inputClass + " pr-8"}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">
+                    m
+                  </span>
+                </div>
+                <span className="block text-[11px] text-muted sm:text-xs">
+                  násobek {paceIn} m
                 </span>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-2xl font-semibold tabular-nums text-foreground sm:text-xl">
-                    {formatPace(avgPace)}
-                  </span>
-                  <span className="text-sm text-muted">/ {paceIn} m</span>
+              </label>
+
+              <label className="block space-y-1.5 sm:space-y-2">
+                <span className={labelClass}>Čas</span>
+                <input
+                  type="text"
+                  value={timeStr}
+                  onChange={(e) => setTimeStr(e.target.value)}
+                  onBlur={commitTime}
+                  placeholder="20:00.00"
+                  className={inputClass}
+                />
+                <span className="block text-[11px] text-muted sm:text-xs">
+                  mm:ss nebo mm:ss.cs
+                </span>
+              </label>
+
+              <div className="space-y-1.5 sm:space-y-2">
+                <span className={labelClass}>Tempo na</span>
+                <div className="grid min-h-11 grid-cols-2 gap-1 rounded-lg border border-border bg-surface-muted p-1 sm:min-h-0">
+                  {([50, 100] as const).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handlePaceInChange(n)}
+                      className={`min-h-10 rounded-md px-3 py-2.5 font-mono text-sm font-semibold transition-all active:scale-[0.97] sm:min-h-0 sm:py-2 ${
+                        paceIn === n
+                          ? "bg-accent text-white shadow-sm"
+                          : "text-foreground-soft hover:bg-surface-elevated hover:text-foreground"
+                      }`}
+                    >
+                      {n} m
+                    </button>
+                  ))}
                 </div>
               </div>
-              {validDistance && (
-                <div className="flex flex-col items-center gap-1 border-t border-border-subtle pt-3 sm:items-end sm:border-t-0 sm:border-l sm:pl-4 sm:pt-0">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted">
-                    Celkový čas
-                  </span>
-                  <span className="font-mono text-2xl font-semibold tabular-nums text-foreground sm:text-xl">
-                    {formatTime(totalTime)}
-                  </span>
-                </div>
-              )}
             </div>
-          )}
+
+            {distanceStr.trim() !== "" && !validDistance && (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2.5 text-sm text-warning"
+              >
+                {distance > 0
+                  ? `Délka musí být násobek ${paceIn} m.`
+                  : "Zadej platnou délku."}
+              </p>
+            )}
+
+            {avgPace != null && (
+              <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border-subtle pt-5">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-muted sm:text-xs">
+                    Průměrné tempo
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-mono text-2xl font-bold tabular-nums text-accent sm:text-xl">
+                      {formatPace(avgPace)}
+                    </span>
+                    <span className="text-sm text-muted">/ {paceIn} m</span>
+                  </div>
+                </div>
+                {validDistance && (
+                  <div className="flex flex-col gap-1 border-l border-border-subtle pl-3 sm:pl-4">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted sm:text-xs">
+                      Celkový čas
+                    </span>
+                    <span className="font-mono text-2xl font-bold tabular-nums text-foreground sm:text-xl">
+                      {formatTime(totalTime)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
+        {/* Pace + Splits panels */}
         <section className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
-          <Panel
-            title="Pace"
-            footer="1:20 nebo 45 — po blur doplní .00"
-          >
+          <Panel title="Pace" footer="1:20 nebo 45 — po opuštění pole doplní .00">
             <ul className="max-h-[min(42dvh,280px)] overflow-y-auto overscroll-contain sm:max-h-72">
               {paces.length === 0 ? (
                 <li className="px-3.5 py-10 text-center text-sm text-muted sm:px-4">
                   Zadej délku a čas
                 </li>
               ) : (
-                paces.map((_, i) => (
-                  <li
-                    key={i}
-                    className="group flex items-center gap-2 border-b border-border-subtle px-3 py-2.5 last:border-0 even:bg-surface-muted/80 sm:gap-3 sm:px-4 sm:py-2"
-                  >
-                    <span className="w-11 shrink-0 font-mono text-[11px] tabular-nums text-accent sm:w-12 sm:text-xs">
-                      {i + 1}×{paceIn}
-                    </span>
-                    <input
-                      type="text"
-                      value={paceInputs[i] ?? ""}
-                      placeholder="1:20"
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setPaceInputs((prev) => {
-                          const next = [...prev];
-                          next[i] = value;
-                          return next;
-                        });
-                      }}
-                      onBlur={(e) => commitPaceRow(i, e.target.value)}
-                      className="min-h-10 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-2 font-mono text-base transition-colors group-hover:border-border focus:border-accent focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-accent-muted sm:min-h-0 sm:py-1 sm:text-sm"
-                    />
-                  </li>
-                ))
+                paces.map((pace, i) => {
+                  const { stripe, text } = avgPace
+                    ? getPaceDeviationClass(pace, avgPace)
+                    : { stripe: "bg-transparent", text: "text-foreground" };
+                  return (
+                    <li
+                      key={i}
+                      className="group relative flex items-center gap-2 border-b border-border-subtle px-3 py-2.5 last:border-0 even:bg-surface-muted/80 sm:gap-3 sm:px-4 sm:py-2"
+                    >
+                      {/* deviation stripe */}
+                      <div className={`absolute inset-y-0 left-0 w-0.5 ${stripe}`} />
+                      <span className="w-11 shrink-0 pl-1.5 font-mono text-[11px] tabular-nums text-accent sm:w-12 sm:text-xs">
+                        {i + 1}×{paceIn}
+                      </span>
+                      <input
+                        type="text"
+                        value={paceInputs[i] ?? ""}
+                        placeholder="1:20"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPaceInputs((prev) => {
+                            const next = [...prev];
+                            next[i] = value;
+                            return next;
+                          });
+                        }}
+                        onBlur={(e) => commitPaceRow(i, e.target.value)}
+                        className={`min-h-10 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-2 font-mono text-base font-medium tabular-nums transition-colors group-hover:border-border focus:border-accent focus:bg-surface-elevated focus:outline-none focus:ring-2 focus:ring-accent-muted sm:min-h-0 sm:py-1 sm:text-sm ${text}`}
+                      />
+                    </li>
+                  );
+                })
               )}
             </ul>
           </Panel>
@@ -324,37 +365,52 @@ export function SwimCalculator() {
                   —
                 </li>
               ) : (
-                splits.map((s) => (
-                  <li
-                    key={s.distance}
-                    className="flex items-center justify-between gap-3 border-b border-border-subtle px-3 py-2.5 last:border-0 even:bg-surface-muted/80 sm:px-4 sm:py-2"
-                  >
-                    <span className="font-mono text-sm tabular-nums text-foreground">
-                      {s.distance}
-                      <span className="ml-0.5 text-xs font-normal text-muted">
-                        m
+                splits.map((s) => {
+                  const progress = distance > 0 ? (s.distance / distance) * 100 : 0;
+                  const isFinish = s.distance >= distance;
+                  return (
+                    <li
+                      key={s.distance}
+                      className={`relative flex items-center justify-between gap-3 border-b border-border-subtle px-3 py-2.5 last:border-0 even:bg-surface-muted/80 sm:px-4 sm:py-2 ${isFinish ? "bg-accent-faint even:bg-accent-faint" : ""}`}
+                    >
+                      {/* progress bar */}
+                      <div
+                        className="pointer-events-none absolute bottom-0 left-0 h-[2px] rounded-full bg-accent/35"
+                        style={{ width: `${progress}%` }}
+                      />
+                      <span className={`font-mono text-sm tabular-nums ${isFinish ? "font-semibold text-accent" : "text-foreground"}`}>
+                        {s.distance}
+                        <span className="ml-0.5 text-xs font-normal text-muted">
+                          m
+                        </span>
                       </span>
-                    </span>
-                    <span className="font-mono text-sm font-semibold tabular-nums text-accent">
-                      {formatTime(s.cumulativeTime)}
-                    </span>
-                  </li>
-                ))
+                      <span className={`font-mono text-sm font-semibold tabular-nums ${isFinish ? "text-accent" : "text-accent"}`}>
+                        {formatTime(s.cumulativeTime)}
+                      </span>
+                    </li>
+                  );
+                })
               )}
             </ul>
           </Panel>
         </section>
 
-        <section className="card-elevated-sm space-y-3 rounded-xl border border-border bg-surface-elevated p-4 sm:p-5">
-          <h2 className="text-center text-sm font-semibold text-foreground sm:text-left">
-            Průběh závodu
-          </h2>
-          <PaceGraph
-            distance={graphDistance}
-            splits={splits}
-            totalTime={graphTotalTime}
-          />
+        {/* Graph */}
+        <section className="card-elevated-sm overflow-hidden rounded-xl border border-border bg-surface-elevated">
+          <div className="shrink-0 bg-gradient-to-r from-accent-deep to-[#0d4f62] px-3.5 py-2.5 sm:px-4 sm:py-3">
+            <h2 className="text-sm font-semibold tracking-wide text-white">
+              Průběh závodu
+            </h2>
+          </div>
+          <div className="p-4 sm:p-5">
+            <PaceGraph
+              distance={graphDistance}
+              splits={splits}
+              totalTime={graphTotalTime}
+            />
+          </div>
         </section>
+
       </div>
     </div>
   );
