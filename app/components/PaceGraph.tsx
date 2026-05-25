@@ -48,26 +48,6 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
     ? { top: 12, right: 10, bottom: 34, left: 38 }
     : { top: 16, right: 14, bottom: 44, left: 46 };
 
-  if (distance <= 0 || totalTime <= 0) {
-    return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-surface-muted px-4 py-10 text-center sm:min-h-[240px]">
-        <svg viewBox="0 0 48 28" fill="none" className="size-10 text-border" aria-hidden="true">
-          <path
-            d="M2 20 C5 13, 10 26, 15 19 C19 13.5, 22 24, 27 18 C30.5 13, 33.5 22, 38 17 C40.5 14, 42.5 17, 46 16"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground-soft">Graf průběhu</p>
-          <p className="text-xs text-muted">Zadej délku a čas</p>
-        </div>
-      </div>
-    );
-  }
-
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
@@ -84,6 +64,16 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
   }, [totalTime, plotW, PAD.left]);
 
   const handleMouseLeave = useCallback(() => setCursor(null), []);
+
+  if (distance <= 0 || totalTime <= 0) {
+    return (
+      <div ref={containerRef} className="overflow-hidden rounded-xl border border-border-subtle bg-surface-muted" style={{ height: H }}>
+        <div className="flex h-full items-center justify-center">
+          <span className="text-sm text-muted">Zadej délku a čas</span>
+        </div>
+      </div>
+    );
+  }
 
   const points: { x: number; y: number }[] = [
     { x: 0, y: 0 },
