@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SplitPoint } from "@/lib/swim-calc";
 import { graphXTicks, graphYTicks } from "@/lib/swim-calc";
 import { formatTime } from "@/lib/time";
@@ -9,10 +10,6 @@ type Props = {
   splits: SplitPoint[];
   totalTime: number;
 };
-
-const W = 600;
-const H = 280;
-const PAD = { top: 18, right: 16, bottom: 52, left: 48 };
 
 function formatTimeAxis(seconds: number): string {
   const { h, min, sec, cs } = (() => {
@@ -31,6 +28,26 @@ function formatTimeAxis(seconds: number): string {
 }
 
 export function PaceGraph({ distance, splits, totalTime }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [svgWidth, setSvgWidth] = useState(600);
+  const [cursor, setCursor] = useState<{ svgX: number; time: number } | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setSvgWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const narrow = svgWidth < 420;
+  const W = svgWidth;
+  const H = narrow ? 200 : 260;
+  const PAD = narrow
+    ? { top: 12, right: 10, bottom: 34, left: 38 }
+    : { top: 16, right: 14, bottom: 44, left: 46 };
+
   if (distance <= 0 || totalTime <= 0) {
     return (
       <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-surface-muted px-4 py-10 text-center sm:min-h-[240px]">
@@ -54,6 +71,20 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    // viewBox matches actual size → coordinates are 1:1 pixels
+    const svgX = e.clientX - rect.left;
+    if (svgX < PAD.left || svgX > PAD.left + plotW) { setCursor(null); return; }
+    const clampedX = Math.max(0, Math.min(svgX - PAD.left, plotW));
+    const time = (clampedX / plotW) * totalTime;
+    setCursor({ svgX: PAD.left + clampedX, time });
+  }, [totalTime, plotW, PAD.left]);
+
+  const handleMouseLeave = useCallback(() => setCursor(null), []);
+
   const points: { x: number; y: number }[] = [
     { x: 0, y: 0 },
     ...splits.map((s) => ({
@@ -64,7 +95,10 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
 
   const maxTime = totalTime;
   const yTicks = graphYTicks(distance);
-  const xTicks = graphXTicks(distance, splits, totalTime);
+  const allXTicks = graphXTicks(distance, splits, totalTime);
+  const xTicks = narrow && allXTicks.length > 4
+    ? allXTicks.filter((_, i, arr) => i === 0 || i === arr.length - 1 || i % 2 === 0)
+    : allXTicks;
 
   const toSvg = (time: number, dist: number) => ({
     sx: PAD.left + (time / maxTime) * plotW,
@@ -89,13 +123,18 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
   ].join(" ");
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-muted">
+    <div ref={containerRef} className="overflow-hidden rounded-xl border border-border-subtle bg-surface-muted">
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="block w-full min-w-0 text-foreground"
-        preserveAspectRatio="xMidYMid meet"
+        width="100%"
+        height={H}
+        className="block min-w-0 text-foreground"
         role="img"
         aria-label="Graf vzdálenosti vůči času"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{ cursor: "crosshair", display: "block" }}
       >
         <defs>
           <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -130,10 +169,11 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
                 strokeDasharray="3 4"
               />
               <text
-                x={PAD.left - 8}
+                x={PAD.left - 6}
                 y={sy + 4}
                 textAnchor="end"
-                className="fill-foreground-soft font-mono text-[10px] sm:text-[11px]"
+                fontSize={narrow ? 9 : 10}
+                className="fill-foreground-soft font-mono"
               >
                 {d}
               </text>
@@ -170,11 +210,10 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
               />
               <text
                 x={labelX}
-                y={H - 14}
+                y={H - (narrow ? 8 : 12)}
                 textAnchor={anchor}
-                className={`font-mono text-[9px] sm:text-[10px] ${
-                  isFinish ? "fill-accent font-semibold" : "fill-muted"
-                }`}
+                fontSize={narrow ? 8 : 10}
+                className={isFinish ? "fill-accent font-mono font-semibold" : "fill-muted font-mono"}
               >
                 {formatTimeAxis(time)}
               </text>
@@ -184,11 +223,12 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
 
         {/* Y axis label */}
         <text
-          x={14}
+          x={narrow ? 10 : 14}
           y={PAD.top + plotH / 2}
           textAnchor="middle"
-          transform={`rotate(-90 14 ${PAD.top + plotH / 2})`}
-          className="fill-accent text-[10px] font-medium"
+          transform={`rotate(-90 ${narrow ? 10 : 14} ${PAD.top + plotH / 2})`}
+          fontSize={narrow ? 9 : 10}
+          className="fill-accent font-medium"
         >
           m
         </text>
@@ -249,17 +289,17 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
         {(() => {
           const endPt = toSvg(totalTime, distance);
           const label = formatTime(totalTime);
-          // ~6px per char in monospace 10px + padding
-          const badgeW = label.length * 6.2 + 12;
-          const badgeH = 16;
+          const fs = narrow ? 9 : 10;
+          const charW = narrow ? 5.4 : 6.2;
+          const badgeW = label.length * charW + 10;
+          const badgeH = narrow ? 14 : 16;
           const isRight = endPt.sx > PAD.left + plotW * 0.6;
           const badgeX = isRight
             ? Math.max(endPt.sx - badgeW - 8, PAD.left + 2)
             : Math.min(endPt.sx + 8, PAD.left + plotW - badgeW - 2);
-          const badgeY = Math.max(endPt.sy - badgeH - 10, PAD.top + 2);
+          const badgeY = Math.max(endPt.sy - badgeH - 8, PAD.top + 2);
           return (
             <g>
-              {/* connector line from badge to dot */}
               <line
                 x1={isRight ? badgeX + badgeW : badgeX}
                 y1={badgeY + badgeH / 2}
@@ -269,7 +309,6 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
                 strokeWidth={1}
                 strokeDasharray="2 2"
               />
-              {/* badge background */}
               <rect
                 x={badgeX}
                 y={badgeY}
@@ -279,18 +318,64 @@ export function PaceGraph({ distance, splits, totalTime }: Props) {
                 className="fill-accent stroke-accent/30"
                 strokeWidth={1}
               />
-              {/* badge text */}
               <text
                 x={badgeX + badgeW / 2}
-                y={badgeY + badgeH / 2 + 4}
+                y={badgeY + badgeH / 2 + fs * 0.38}
                 textAnchor="middle"
-                className="fill-white font-mono text-[10px] font-bold"
+                fontSize={fs}
+                className="fill-white font-mono font-bold"
               >
                 {label}
               </text>
             </g>
           );
         })()}
+
+        {/* Cursor crosshair */}
+        {cursor && (() => {
+          const label = formatTime(cursor.time);
+          const fs = narrow ? 9 : 10;
+          const charW = narrow ? 5.4 : 6.2;
+          const badgeW = label.length * charW + 12;
+          const badgeH = narrow ? 15 : 18;
+          const badgeX = cursor.svgX + 6 + badgeW > PAD.left + plotW
+            ? cursor.svgX - badgeW - 6
+            : cursor.svgX + 6;
+          const badgeY = PAD.top + 4;
+          return (
+            <g style={{ pointerEvents: "none" }}>
+              <line
+                x1={cursor.svgX}
+                x2={cursor.svgX}
+                y1={PAD.top}
+                y2={PAD.top + plotH}
+                className="stroke-accent"
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                opacity={0.85}
+              />
+              <rect
+                x={badgeX}
+                y={badgeY}
+                width={badgeW}
+                height={badgeH}
+                rx={4}
+                className="fill-accent stroke-accent/30"
+                strokeWidth={1}
+              />
+              <text
+                x={badgeX + badgeW / 2}
+                y={badgeY + badgeH / 2 + fs * 0.38}
+                textAnchor="middle"
+                fontSize={fs}
+                className="fill-white font-mono font-bold"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })()}
+
       </svg>
     </div>
   );
